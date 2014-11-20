@@ -1,5 +1,7 @@
 module CorpusParsing (
     getCorpora,
+    getSimpleCorpus,
+    countWords,
     ppOccTable
     ) where
 
@@ -26,20 +28,14 @@ getCorpora = do aCorpus <- fmap (cleanCorpusFiltering (\(Element n _ _ _) -> n =
 
                 return (aCorpus, bCorpus)
 
-cleanCorpusFiltering :: (Element -> Bool) -> String -> [String]
-cleanCorpusFiltering p = -- Removed guillemets may have uncovered one more layer of punctuation
-                         foldr (separatePunctuation id) []
-                       -- Separate punctuation and remove guillemets in the same pass
-                       . foldr (separatePunctuation removeGuillemets) []
-                       -- Splice linebreak-separated words
-                       . foldr (\w acc -> if length w > 1 && last w == '-'
-                                          then (init w ++ head acc) : tail acc
-                                          else w : acc) []
-                       . words
-                       . concatMap stringFromElement
-                       . filter p
-                       . onlyElems
-                       . parseXML
+getSimpleCorpus :: IO [String]
+getSimpleCorpus = fmap (cleanSimpleCorpus . words) $ readFile "fsrtexte"
+
+cleanSimpleCorpus :: [String] -> [String]
+cleanSimpleCorpus = -- Removed guillemets may have uncovered one more layer of punctuation
+                    foldr (separatePunctuation id) []
+                    -- Separate punctuation and remove guillemets in the same pass
+                  . foldr (separatePunctuation removeGuillemets) []
     where separatePunctuation finfunc w acc
             | w == "..." = "…" : acc
             | otherwise = if length w > 1 && last w `elem` ['.', ',', '!', '?', ':', ';']
@@ -53,7 +49,19 @@ cleanCorpusFiltering p = -- Removed guillemets may have uncovered one more layer
                                             then (try init) nopre else nopre
                                    try f l = if length l > 1 then f l else l
                                in nopost
-          stringFromElement = foldr go "" . elContent
+
+cleanCorpusFiltering :: (Element -> Bool) -> String -> [String]
+cleanCorpusFiltering p = cleanSimpleCorpus
+                       -- Splice linebreak-separated words
+                       . foldr (\w acc -> if length w > 1 && last w == '-'
+                                          then (init w ++ head acc) : tail acc
+                                          else w : acc) []
+                       . words
+                       . concatMap stringFromElement
+                       . filter p
+                       . onlyElems
+                       . parseXML
+    where stringFromElement = foldr go "" . elContent
               where go :: Content -> String -> String
                     go (Elem el) acc = stringFromElement el ++ acc
                     go (Text cd) acc = cdData cd ++ acc

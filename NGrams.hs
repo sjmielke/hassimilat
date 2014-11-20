@@ -13,7 +13,7 @@ import System.Random (randomR, getStdGen)
 type BigramMap = M.Map String (M.Map String Int)
 
 main :: IO ()
-main = do (aCorpus, bCorpus) <- getCorpora
+main = do {-(aCorpus, bCorpus) <- getCorpora
           let aBigrams = getBigrams aCorpus
           let bBigrams = getBigrams bCorpus
           
@@ -21,6 +21,13 @@ main = do (aCorpus, bCorpus) <- getCorpora
           putStrLn $ unwords $ take 100 $ buildText aBigrams
           putStrLn "Sample B"
           putStrLn $ unwords $ take 100 $ buildText bBigrams
+          -}
+          
+          fsrCorpus <- getSimpleCorpus
+          putStrLn $ ppOccTable $ countWords $ fsrCorpus
+          let fsrBigrams = getBigrams fsrCorpus
+          putStrLn "Sample FSR"
+          putStrLn $ unwords $ take 1000 $ buildText fsrBigrams
 
 -- getBigrams ignores the data for the first and last word, why bother,
 -- last one is likely just a dot or something similar anyway.
