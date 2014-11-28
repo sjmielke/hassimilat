@@ -28,8 +28,8 @@ getCorpora = do aCorpus <- fmap (cleanCorpusFiltering (\(Element n _ _ _) -> n =
 
                 return (aCorpus, bCorpus)
 
-getSimpleCorpus :: IO [String]
-getSimpleCorpus = fmap (cleanSimpleCorpus . words) $ readFile "fsrtexte"
+getSimpleCorpus :: String -> IO [String]
+getSimpleCorpus = fmap (cleanSimpleCorpus . words) . readFile
 
 cleanSimpleCorpus :: [String] -> [String]
 cleanSimpleCorpus = -- Removed guillemets may have uncovered one more layer of punctuation
