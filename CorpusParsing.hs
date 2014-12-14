@@ -1,8 +1,6 @@
 module CorpusParsing (
-    getCorpora,
     getSimpleCorpus,
-    countWords,
-    ppOccTable
+    cleanCorpusFiltering
     ) where
 
 import Data.Char (isLetter, isDigit)
@@ -10,23 +8,11 @@ import Data.List (sortBy)
 import qualified Data.Map.Strict as M
 import Data.Maybe (fromJust)
 import Data.Ord (comparing, Down(..))
-import Text.Printf
 import Text.XML.Light
 import Debug.Trace (trace)
 
-getCorpora :: IO ([String], [String])
-getCorpora = do aCorpus <- fmap (cleanCorpusFiltering (\(Element n _ _ _) -> n == unqual "p"))
-                         $ readFile "mueller_clean_orig_input.html"
-                bCorpus <- fmap (cleanCorpusFiltering (\(Element _ as _ _) -> as == [Attr (unqual "align") "justify"]))
-                         $ readFile "schmid_clean_orig_input.html"
-                let getProblems = unlines . filter (\s -> not $ length s == 1 || all isLetter s || all isDigit s)
-
-                -- putStrLn $ "A / mueller\n" ++ ppOccTable (countWords aCorpus)
-                -- putStrLn $ "B / schmid\n" ++ ppOccTable (countWords bCorpus)
-                putStrLn $ ("Problems in A: "++) $ show . length $ getProblems aCorpus
-                putStrLn $ ("Problems in B: "++) $ show . length $ getProblems bCorpus
-
-                return (aCorpus, bCorpus)
+getProblematicWords :: [String] -> [String]
+getProblematicWords = filter (\s -> not $ length s == 1 || all isLetter s || all isDigit s)
 
 getSimpleCorpus :: String -> IO [String]
 getSimpleCorpus = fmap (cleanSimpleCorpus . words) . readFile
@@ -66,38 +52,3 @@ cleanCorpusFiltering p = cleanSimpleCorpus
                     go (Elem el) acc = stringFromElement el ++ acc
                     go (Text cd) acc = cdData cd ++ acc
                     go (CRef _) acc = acc
-
-countWords :: [String] -> M.Map String Int
-countWords = foldl (\m w -> M.insertWith (+) w 1 m) (M.empty :: M.Map String Int)
-
-ppOccTable :: M.Map String Int -> String
-ppOccTable inmap =  hr
-                 ++ printf ("|%" ++ show (wwidth + nwidth + 2) ++ "d")
-                           allWords
-                 ++ " words|\n"
-                 ++ hr
-                 ++ concatMap (\(w, n) -> printf ("|%" ++ show wwidth ++ "s") w
-                                       ++ printf ("|%" ++ show nwidth ++ "d") n
-                                       ++ printf ("|%6.4f|\n") (n `percentOf` allWords))
-                              table
-                 ++ hr
-                 ++ printf ("|%6.3f") (fromIntegral allWords / fromIntegral punctuation :: Double)
-                 ++ replicate (wwidth + nwidth - 7) ' ' ++ " wo./sen.|\n"
-                 ++ hr
-                 ++ "| . ! ?" ++ replicate (wwidth + nwidth + 2) ' ' ++ "|\n"
-                 ++ printf ("|%5.2f") ((fromJust $ M.lookup "." inmap) `percentOf` sentenceEnds)
-                 ++ printf (" %5.2f") ((fromJust $ M.lookup "!" inmap) `percentOf` sentenceEnds)
-                 ++ printf (" %5.2f") ((fromJust $ M.lookup "?" inmap) `percentOf` sentenceEnds)
-                 ++ replicate (wwidth + nwidth - 9) ' ' ++ "|\n"
-                 ++ hr
-    where table = take 30
-                $ sortBy (comparing (Down . snd))
-                $ M.toList inmap
-          wwidth = maximum $ map (length . fst) table
-          nwidth = maximum $ map (length . show . snd) table
-          hr = "+" ++ replicate wwidth '-' ++ "+" ++ replicate nwidth '-' ++ "+------+\n"
-          allWords = sum $ M.elems inmap
-          a `percentOf` b = 100 * fromIntegral a / fromIntegral b :: Double
-          sumWords ws = sum $ M.elems $ M.filterWithKey (\x _ -> head x `elem` ws) inmap
-          punctuation = sumWords ['.', '!', '?', ':', ';']
-          sentenceEnds = sumWords ['.', '!', '?']

@@ -1,6 +1,9 @@
--- module NGrams where
-
-import CorpusParsing
+module NGrams (
+    countWords,
+    ppOccTable,
+    getBigrams,
+    getText
+    ) where
 
 import Control.Monad.State.Lazy (evalState, get, put)
 import Data.Char (toUpper)
@@ -10,31 +13,44 @@ import qualified Data.Map.Strict as M
 import Data.Maybe (fromJust)
 import System.IO.Unsafe (unsafePerformIO)
 import System.Random (randomR, getStdGen)
+import Text.Printf
 
 type BigramMap = M.Map String (M.Map String Int)
 
-main :: IO ()
-main = do {-(aCorpus, bCorpus) <- getCorpora
-          let aBigrams = getBigrams aCorpus
-          let bBigrams = getBigrams bCorpus
-          
-          putStrLn "Sample A"
-          putStrLn $ unwords $ take 100 $ buildText aBigrams
-          putStrLn "Sample B"
-          putStrLn $ unwords $ take 100 $ buildText bBigrams
-          -}
-          
-          {-fsrCorpus <- getSimpleCorpus "fsrtexte"
-          richard <- getSimpleCorpus "richardscorpus"
-          let combinedCorpus = take  0 fsrCorpus ++ richard
-          putStrLn $ ppOccTable $ countWords $ combinedCorpus
-          let combinedBigrams = getBigrams combinedCorpus
-          putStrLn $ unwords $ take 1000 $ buildText combinedBigrams
-          -}
-          
-          japterCorpus <- fmap (map (map toUpper)) $ getSimpleCorpus "japter_plain"
-          putStrLn $ ppOccTable $ countWords $ japterCorpus
-          putStrLn $ getText 1000 $ getBigrams $ japterCorpus
+countWords :: [String] -> M.Map String Int
+countWords = foldl (\m w -> M.insertWith (+) w 1 m) (M.empty :: M.Map String Int)
+
+ppOccTable :: M.Map String Int -> String
+ppOccTable inmap =  hr
+                 ++ printf ("|%" ++ show (wwidth + nwidth + 2) ++ "d")
+                           allWords
+                 ++ " words|\n"
+                 ++ hr
+                 ++ concatMap (\(w, n) -> printf ("|%" ++ show wwidth ++ "s") w
+                                       ++ printf ("|%" ++ show nwidth ++ "d") n
+                                       ++ printf ("|%6.4f|\n") (n `percentOf` allWords))
+                              table
+                 ++ hr
+                 ++ printf ("|%6.3f") (fromIntegral allWords / fromIntegral punctuation :: Double)
+                 ++ replicate (wwidth + nwidth - 7) ' ' ++ " wo./sen.|\n"
+                 ++ hr
+                 ++ "| . ! ?" ++ replicate (wwidth + nwidth + 2) ' ' ++ "|\n"
+                 ++ printf ("|%5.2f") ((fromJust $ M.lookup "." inmap) `percentOf` sentenceEnds)
+                 ++ printf (" %5.2f") ((fromJust $ M.lookup "!" inmap) `percentOf` sentenceEnds)
+                 ++ printf (" %5.2f") ((fromJust $ M.lookup "?" inmap) `percentOf` sentenceEnds)
+                 ++ replicate (wwidth + nwidth - 9) ' ' ++ "|\n"
+                 ++ hr
+    where table = take 30
+                $ sortBy (comparing (Down . snd))
+                $ M.toList inmap
+          wwidth = maximum $ map (length . fst) table
+          nwidth = maximum $ map (length . show . snd) table
+          hr = "+" ++ replicate wwidth '-' ++ "+" ++ replicate nwidth '-' ++ "+------+\n"
+          allWords = sum $ M.elems inmap
+          a `percentOf` b = 100 * fromIntegral a / fromIntegral b :: Double
+          sumWords ws = sum $ M.elems $ M.filterWithKey (\x _ -> head x `elem` ws) inmap
+          punctuation = sumWords ['.', '!', '?', ':', ';']
+          sentenceEnds = sumWords ['.', '!', '?']
 
 -- getBigrams ignores the data for the first and last word, why bother,
 -- last one is likely just a dot or something similar anyway.
