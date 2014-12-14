@@ -1,7 +1,11 @@
 import NGrams
+import TreeParsing (SNode(NT, T))
 import MyCorpusData
 
-import TreeParsing (flattenTree, formatInfoTree)
+import qualified Data.Foldable as F
+import qualified Data.Map.Strict as M
+import qualified Data.Set as S
+import Data.Tree (drawTree)
 
 main :: IO ()
 main = do {- aCorpus <- getWordListCorpus Mueller
@@ -28,7 +32,14 @@ main = do {- aCorpus <- getWordListCorpus Mueller
           -- -}
           
           tiger <- getTreeCorpus Tiger
-          putStrLn $ unlines . map formatInfoTree
-                   -- $ take 100 
-                   $ (:[]) . (!!42)
-                   $ tiger -- About 50k sentences. Nice.
+          -- putStrLn $ drawTree . fmap show $ tiger !! 42
+          
+          let addIntoMap oldmap (T p w) = M.insertWith (\new old -> S.insert w old)
+                                                       p
+                                                       (S.singleton w)
+                                                       oldmap
+              addIntoMap oldmap _ = oldmap
+          let posChoices = F.foldl' (F.foldl' addIntoMap)
+                                    (M.empty :: M.Map String (S.Set String))
+                                    (take 50 tiger)
+          print $ M.lookup "NN" posChoices

@@ -10,7 +10,7 @@ import Debug.Trace (trace)
 
 -- | Heavily simplified sentence tree with non-/terminals,
 -- where a terminal carries both the POS tag and specific word.
-data SNode = NT String | T String String
+data SNode = NT String | T String String deriving Show
 
 simplifySentenceTree :: Tree (Maybe SentenceData) -> Tree SNode
 simplifySentenceTree = fmap fnc
@@ -36,9 +36,3 @@ flattenTree = beautifulUnwords . foldr fnc [] . flatten
     where fnc Nothing = id
           fnc (Just (SentenceWord w p m _ _ _)) = (++[w])
           fnc (Just (SentenceNode _ p m _ _ _)) = id
-
-formatInfoTree :: Tree (Maybe SentenceData) -> String
-formatInfoTree = drawTree . fmap fnc
-    where fnc Nothing = "ROOT"
-          fnc (Just (SentenceWord w p m _ _ _)) = w ++ " (" ++ p ++ ")"
-          fnc (Just (SentenceNode _ p m _ _ _)) = p

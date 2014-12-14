@@ -23,5 +23,6 @@ getWordListCorpus Schmid = fmap ( cleanCorpusFiltering
                          $ readFile "data/schmid_clean_orig_input.html"
 getWordListCorpus JapTer = getSimpleCorpus "data/japter_plain"
 
-getTreeCorpus :: TreeCorpusName -> IO [Tree (Maybe SentenceData)]
-getTreeCorpus Tiger = fmap simpleParseNegra $ TIO.readFile "data/tiger_release_aug07.export"
+getTreeCorpus :: TreeCorpusName -> IO [Tree SNode]
+getTreeCorpus Tiger = fmap (map simplifySentenceTree . simpleParseNegra)
+                    $ TIO.readFile "data/tiger_release_aug07.export"
