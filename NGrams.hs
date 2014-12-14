@@ -36,9 +36,9 @@ ppOccTable inmap =  hr
                  ++ replicate (wwidth + nwidth - 7) ' ' ++ " wo./sen.|\n"
                  ++ hr
                  ++ "| . ! ?" ++ replicate (wwidth + nwidth + 2) ' ' ++ "|\n"
-                 ++ printf ("|%5.2f") ((fromJust $ M.lookup "." inmap) `percentOf` sentenceEnds)
-                 ++ printf (" %5.2f") ((fromJust $ M.lookup "!" inmap) `percentOf` sentenceEnds)
-                 ++ printf (" %5.2f") ((fromJust $ M.lookup "?" inmap) `percentOf` sentenceEnds)
+                 ++ printf ("|%5.2f") ((tryFromJust $ M.lookup "." inmap) `percentOf` sentenceEnds)
+                 ++ printf (" %5.2f") ((tryFromJust $ M.lookup "!" inmap) `percentOf` sentenceEnds)
+                 ++ printf (" %5.2f") ((tryFromJust $ M.lookup "?" inmap) `percentOf` sentenceEnds)
                  ++ replicate (wwidth + nwidth - 9) ' ' ++ "|\n"
                  ++ hr
     where table = take 30
@@ -52,6 +52,7 @@ ppOccTable inmap =  hr
           sumWords ws = sum $ M.elems $ M.filterWithKey (\x _ -> head x `elem` ws) inmap
           punctuation = sumWords ['.', '!', '?', ':', ';']
           sentenceEnds = sumWords ['.', '!', '?']
+          tryFromJust m = case m of Nothing -> 0; Just i -> i
 
 -- getBigrams ignores the data for the first and last word, why bother,
 -- last one is likely just a dot or something similar anyway.

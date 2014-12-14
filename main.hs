@@ -4,6 +4,7 @@ import MyCorpusData
 
 import qualified Data.Foldable as F
 import qualified Data.Map.Strict as M
+import Data.Maybe (fromJust)
 import qualified Data.Set as S
 import Data.Tree (drawTree)
 
@@ -34,12 +35,12 @@ main = do {- aCorpus <- getWordListCorpus Mueller
           tiger <- getTreeCorpus Tiger
           -- putStrLn $ drawTree . fmap show $ tiger !! 42
           
-          let addIntoMap oldmap (T p w) = M.insertWith (\new old -> S.insert w old)
+          let addIntoMap oldmap (T p w) = M.insertWith (\_ -> M.insertWith (+) w 1)
                                                        p
-                                                       (S.singleton w)
+                                                       (M.singleton w 1)
                                                        oldmap
               addIntoMap oldmap _ = oldmap
           let posChoices = F.foldl' (F.foldl' addIntoMap)
-                                    (M.empty :: M.Map String (S.Set String))
-                                    (take 50 tiger)
-          print $ M.lookup "NN" posChoices
+                                    (M.empty :: M.Map String (M.Map String Int))
+                                    tiger
+          putStrLn $ ppOccTable $ fromJust $ M.lookup "NN" posChoices
