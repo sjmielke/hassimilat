@@ -2,7 +2,8 @@ module NGrams (
     countWords,
     ppOccTable,
     getBigrams,
-    getText
+    getText,
+    beautifulUnwords
     ) where
 
 import Control.Monad.State.Lazy (evalState, get, put)
@@ -60,7 +61,10 @@ getBigrams = go M.empty
           go m _ = m
 
 getText :: Int -> BigramMap -> String
-getText n = tail . foldr accOp "" . take n . buildText
+getText n = beautifulUnwords . take n . buildText
+
+beautifulUnwords :: [String] -> String
+beautifulUnwords = tail . foldr accOp ""
     where accOp el acc = if (el `elem` [",", ".", "!", "?", ")"]) || (not (null acc) && last acc == '(')
                          then acc ++ el
                          else acc ++ ' ':el -- TODO Use a difference-list-based approach or packaged builders for concat

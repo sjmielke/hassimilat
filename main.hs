@@ -1,8 +1,10 @@
 import NGrams
 import MyCorpusData
 
+import TreeParsing (flattenTree, formatInfoTree)
+
 main :: IO ()
-main = do aCorpus <- getWordListCorpus Mueller
+main = do {- aCorpus <- getWordListCorpus Mueller
           bCorpus <- getWordListCorpus Schmid
           let aBigrams = getBigrams aCorpus
           let bBigrams = getBigrams bCorpus
@@ -24,3 +26,9 @@ main = do aCorpus <- getWordListCorpus Mueller
           putStrLn $ ppOccTable $ countWords $ japterCorpus
           putStrLn $ getText 1000 $ getBigrams $ japterCorpus
           -- -}
+          
+          tiger <- getTreeCorpus Tiger
+          putStrLn $ unlines . map formatInfoTree
+                   -- $ take 100 
+                   $ (:[]) . (!!42)
+                   $ tiger -- About 50k sentences. Nice.
