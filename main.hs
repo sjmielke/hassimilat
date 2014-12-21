@@ -58,16 +58,25 @@ main = do {- aCorpus <- getWordListCorpus Mueller
           
           let rulesOcc = countRules tiger
           
-          {- putStrLn $ unlines . map show
-                   $ sortBy (compare `on` snd)
-                   $ filter (\((x,_),_) -> x == "ROOT")
-                   $ M.toList rulesOcc
-          -- -}
+          let printNBest n tag = putStrLn
+                               $ unlines . map show
+                               $ take n
+                               $ reverse
+                               $ sortBy (compare `on` snd)
+                               $ filter (\((x,_),_) -> x == tag)
+                               $ M.toList rulesOcc
           
           print $ M.size rulesOcc
+          
           let usedTags = map (\l -> (head l, length l)) . group $ map fst $ M.keys rulesOcc
           putStrLn $ unlines . map show $ usedTags
           
+          -- mapM_ (printNBest 1 . fst) usedTags
+          
+          print $ countCallers "VVFIN" rulesOcc
+          print $ countCallers "SPELL" rulesOcc
+          print $ countCallers "NN" rulesOcc
+          print $ countCallers "NE" rulesOcc
 
 getUsedTags :: [Tree SNode] -> M.Map String (Bool, Bool) -- name, used in inner node (NT), used in leaf (T)
 getUsedTags = F.foldl' (F.foldl' ins)
@@ -92,3 +101,12 @@ countRules = F.foldl' readoff (M.empty :: M.Map Rule Int)
                 in newrule `deepseq`
                    F.foldl' readoff (M.insertWith (+) newrule 1 rulemap) children
           readoff rulemap _ = rulemap
+
+countCallers :: String -> M.Map Rule Int -> M.Map String Int
+countCallers callee = M.foldlWithKey' ( \ oldresmap rule occ
+                                       -> M.insertWith (+)
+                                                       (fst rule)
+                                                       occ
+                                                       oldresmap )
+                               (M.empty :: M.Map String Int)
+                    . M.filterWithKey (\rule _ -> callee `elem` snd rule)
