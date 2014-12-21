@@ -10,7 +10,7 @@ import Debug.Trace (trace)
 
 -- | Heavily simplified sentence tree with non-/terminals,
 -- where a terminal carries both the POS tag and specific word.
-data SNode = NT String | T String String deriving Show
+data SNode = NT {tag::String} | T {tag::String, word::String} deriving Show
 
 simplifySentenceTree :: Tree (Maybe SentenceData) -> Tree SNode
 simplifySentenceTree = fmap fnc
