@@ -12,94 +12,77 @@ import System.Random (StdGen, randomR, getStdGen)
 
 main :: IO ()
 main = do tiger <- getTreeCorpus Tiger
-          -- putStrLn $ drawTree . fmap show $ tiger !! 42
-          
-          {- let addIntoMap oldmap (T p w) = M.insertWith (\_ -> M.insertWith (+) w 1)
-                                                       p
-                                                       (M.singleton w 1)
-                                                       oldmap
-              addIntoMap oldmap _ = oldmap
-          let posChoices = F.foldl' (F.foldl' addIntoMap)
-                                    (M.empty :: M.Map String (M.Map String Int))
-                                    tiger
-          putStrLn $ ppOccTable $ fromJust $ M.lookup "ART" posChoices
-          -- -}
-          
-          -- putStrLn $ unlines $ map show $ filter (fst . snd) $ M.toAscList $ getUsedTags tiger
-          
-          -- let rules = getRules tiger
-          
-          -- print $ S.size rules
-          -- putStrLn $ unlines . map show $ filter (\(x,_) -> x == "ROOT") $ S.toList rules
-          
           let rulesOcc = countRules tiger
-          
-          {-
-          let printNBest n tag = putStrLn
-                               $ unlines . map show
-                               $ take n
-                               $ reverse
-                               $ sortBy (comparing snd)
-                               $ filter (\((x,_),_) -> x == tag)
-                               $ M.toList rulesOcc
-          -- -}
-          
-          -- print $ M.size rulesOcc
-          
-          -- let usedTags = map (\l -> (head l, length l)) . group $ map fst $ M.keys rulesOcc
-          -- putStrLn $ unlines . map show $ usedTags
-          
-          -- mapM_ (printNBest 1 . fst) usedTags
-          
-          -- print $ countCallers "VVFIN" rulesOcc
-          
-          -- print $ M.foldl (+) 0 $ M.map length $ toConstructiveForm rulesOcc
-          
           let ruleBook = toConstructiveForm rulesOcc
           
-          print $ bestRule "S" ruleBook
+          let wordOcc = countWordRules tiger
+          let wordBook = toConstructiveForm wordOcc
           
-          print   $ derivationStep ruleBook
-                =<< derivationStep ruleBook
-                =<< return "S"
-          
-          putStrLn ""
           rndGen <- getStdGen
           
-          print $ sort $ evalState (sequence $ replicate 100 (decentRandomRule "S" ruleBook)) rndGen
+          let dStep :: [String] -> State StdGen [String]
+              dStep l = mapM (decentRandomDerivationStep ruleBook wordBook) l >>= return . concat
+          
+          let fullyDerive :: [String] -> State StdGen [String]
+              fullyDerive xs = do xs' <- dStep xs
+                                  if xs == xs' then return xs else fullyDerive xs'
+          
+          let generateSentence :: State StdGen [String]
+              -- generateSentence = decentRandomLookup "S" ruleBook
+              generateSentence = fullyDerive ["S", "$."]
+          mapM_ (putStrLn . beautifulUnwords) $ sort
+                                              $ evalState (sequence $ replicate 100 generateSentence) rndGen
 
 -- Note: I stay with the simple Int scores for now, choosing
 -- best options works just as well there (as we have seen
 -- in the other generation mechanisms before).
 -- The values (the rhs lists) are sorted in descending order.
-toConstructiveForm :: M.Map (String, [String]) Int -> M.Map String [([String], Int)]
+toConstructiveForm :: M.Map (String, rhs) Int -> M.Map String [(rhs, Int)]
 toConstructiveForm = M.map (reverse . sortBy (comparing snd))
                    . M.foldlWithKey' ( \ oldresmap (lhs, rhs) occ
                                       -> M.insertWith (\new -> ((head new):))
                                                       lhs
                                                       [(rhs, occ)]
                                                       oldresmap )
-                                     (M.empty :: M.Map String [([String], Int)])
+                                     (M.empty :: M.Map String [(rhs, Int)])
 
-bestRule :: String -> M.Map String [([String], Int)] -> [String]
-bestRule lhs = fst
-             . head
-             . fromJust
-             . M.lookup lhs
+bestLookup :: String -> M.Map String [(a, Int)] -> a
+bestLookup lhs = fst
+               . head
+               . fromJust
+               . M.lookup lhs
 
-decentRandomRule :: String -> M.Map String [([String], Int)] -> State StdGen [String]
-decentRandomRule lhs = takeSomeRandomOne
-                     . fromJust
-                     . M.lookup lhs
+decentRandomLookup :: String -> M.Map String [(a, Int)] -> State StdGen a
+decentRandomLookup lhs = takeSomeRandomOne
+                       . fromJust
+                       . M.lookup lhs
     where takeSomeRandomOne l = do randomGen <- get
                                    let (n, newGen) = randomR (-3.0, 0.0 :: Double) randomGen
                                    put newGen
-                                   return $ fst $ l !! (floor $ (fromIntegral $ min 10 (length l)) * exp n)
+                                   return $ fst $ l !! (floor $ (fromIntegral $ min 30 (length l)) * exp n)
 
-derivationStep :: M.Map String [([String], Int)] -> String -> [String]
-derivationStep m lhs = if isNT lhs m
-                       then bestRule lhs m
-                       else [lhs]
+bestDerivationStep :: M.Map String [([String], Int)]
+                   -> M.Map String [(String, Int)]
+                   -> String
+                   -> [String]
+bestDerivationStep rules words lhs = if isNT lhs rules
+                                     then bestLookup lhs rules
+                                     else if isT lhs words
+                                          then [bestLookup lhs words]
+                                          else [lhs]
+
+decentRandomDerivationStep :: M.Map String [([String], Int)]
+                           -> M.Map String [(String, Int)]
+                           -> String
+                           -> State StdGen [String]
+decentRandomDerivationStep rules words lhs = if isNT lhs rules
+                                             then decentRandomLookup lhs rules
+                                             else if isT lhs words
+                                                  then fmap (:[]) $ decentRandomLookup lhs words
+                                                  else return [lhs]
 
 isNT :: String -> M.Map String [([String], Int)] -> Bool
 isNT x = elem x . M.keys
+
+isT  :: String -> M.Map String [(String, Int)] -> Bool
+isT x = elem x . M.keys

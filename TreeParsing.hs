@@ -1,6 +1,7 @@
 module TreeParsing ( SNode(NT, T)
                    , tag
                    , countRules
+                   , countWordRules
                    , countCallers
                    , simplifySentenceTree
                    , simpleParseNegra
@@ -73,6 +74,14 @@ countRules = F.foldl' readoff (M.empty :: M.Map Rule Int)
                 in newrule `deepseq`
                    F.foldl' readoff (M.insertWith (+) newrule 1 rulemap) children
           readoff rulemap _ = rulemap
+
+countWordRules :: [Tree SNode] -> M.Map (String, String) Int
+countWordRules = F.foldl' (\wordmap -> F.foldl' readoff wordmap . flatten)
+                          (M.empty :: M.Map (String, String) Int)
+    where readoff wordmap (T tag word) =
+                let newrule = (tag, word)
+                in newrule `deepseq` M.insertWith (+) newrule 1 wordmap
+          readoff wordmap _ = wordmap
 
 countCallers :: String -> M.Map Rule Int -> M.Map String Int
 countCallers callee = M.foldlWithKey' ( \ oldresmap rule occ
