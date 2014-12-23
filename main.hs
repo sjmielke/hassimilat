@@ -1,41 +1,17 @@
 import NGrams
-import TreeParsing (SNode(NT, T), tag)
+import TreeParsing
 import MyCorpusData
 
-import Control.DeepSeq (deepseq)
-import qualified Data.Foldable as F
+import Control.Monad.State.Strict (State, runState, evalState, get, put)
 import qualified Data.Map.Strict as M
-import Data.Function (on)
-import Data.List (sortBy, nub, group)
+import Data.List (sortBy, nub, group, sort)
 import Data.Maybe (fromJust)
-import qualified Data.Set as S
+import Data.Ord (comparing)
 import Data.Tree (Tree(Node), rootLabel, subForest, drawTree)
+import System.Random (StdGen, randomR, getStdGen)
 
 main :: IO ()
-main = do {- aCorpus <- getWordListCorpus Mueller
-          bCorpus <- getWordListCorpus Schmid
-          let aBigrams = getBigrams aCorpus
-          let bBigrams = getBigrams bCorpus
-          
-          putStrLn "Sample A"
-          putStrLn $ getText 200 aBigrams
-          putStrLn "Sample B"
-          putStrLn $ getText 200 bBigrams
-          -- -}
-          
-          {- fsrCorpus <- getWordListCorpus FSR
-          richard <- getWordListCorpus Richard
-          let combinedCorpus = take 1000 fsrCorpus ++ richard
-          putStrLn $ ppOccTable $ countWords $ combinedCorpus
-          putStrLn $ getText 200 $ getBigrams combinedCorpus
-          -- -}
-          
-          {- japterCorpus <- fmap (map (map toUpper)) $ getWordListCorpus JapTer
-          putStrLn $ ppOccTable $ countWords $ japterCorpus
-          putStrLn $ getText 1000 $ getBigrams $ japterCorpus
-          -- -}
-          
-          tiger <- getTreeCorpus Tiger
+main = do tiger <- getTreeCorpus Tiger
           -- putStrLn $ drawTree . fmap show $ tiger !! 42
           
           {- let addIntoMap oldmap (T p w) = M.insertWith (\_ -> M.insertWith (+) w 1)
@@ -58,55 +34,72 @@ main = do {- aCorpus <- getWordListCorpus Mueller
           
           let rulesOcc = countRules tiger
           
+          {-
           let printNBest n tag = putStrLn
                                $ unlines . map show
                                $ take n
                                $ reverse
-                               $ sortBy (compare `on` snd)
+                               $ sortBy (comparing snd)
                                $ filter (\((x,_),_) -> x == tag)
                                $ M.toList rulesOcc
+          -- -}
           
-          print $ M.size rulesOcc
+          -- print $ M.size rulesOcc
           
-          let usedTags = map (\l -> (head l, length l)) . group $ map fst $ M.keys rulesOcc
-          putStrLn $ unlines . map show $ usedTags
+          -- let usedTags = map (\l -> (head l, length l)) . group $ map fst $ M.keys rulesOcc
+          -- putStrLn $ unlines . map show $ usedTags
           
           -- mapM_ (printNBest 1 . fst) usedTags
           
-          print $ countCallers "VVFIN" rulesOcc
-          print $ countCallers "SPELL" rulesOcc
-          print $ countCallers "NN" rulesOcc
-          print $ countCallers "NE" rulesOcc
+          -- print $ countCallers "VVFIN" rulesOcc
+          
+          -- print $ M.foldl (+) 0 $ M.map length $ toConstructiveForm rulesOcc
+          
+          let ruleBook = toConstructiveForm rulesOcc
+          
+          print $ bestRule "S" ruleBook
+          
+          print   $ derivationStep ruleBook
+                =<< derivationStep ruleBook
+                =<< return "S"
+          
+          putStrLn ""
+          rndGen <- getStdGen
+          
+          print $ sort $ evalState (sequence $ replicate 100 (decentRandomRule "S" ruleBook)) rndGen
 
-getUsedTags :: [Tree SNode] -> M.Map String (Bool, Bool) -- name, used in inner node (NT), used in leaf (T)
-getUsedTags = F.foldl' (F.foldl' ins)
-                       (M.empty :: M.Map String (Bool, Bool))
-    where ins tagmap (NT tag) = M.insertWith (\_ (nt,t) -> (True,t)) tag (True, False) tagmap
-          ins tagmap (T tag _) = M.insertWith (\_ (nt,t) -> (nt,True)) tag (False, True) tagmap
+-- Note: I stay with the simple Int scores for now, choosing
+-- best options works just as well there (as we have seen
+-- in the other generation mechanisms before).
+-- The values (the rhs lists) are sorted in descending order.
+toConstructiveForm :: M.Map (String, [String]) Int -> M.Map String [([String], Int)]
+toConstructiveForm = M.map (reverse . sortBy (comparing snd))
+                   . M.foldlWithKey' ( \ oldresmap (lhs, rhs) occ
+                                      -> M.insertWith (\new -> ((head new):))
+                                                      lhs
+                                                      [(rhs, occ)]
+                                                      oldresmap )
+                                     (M.empty :: M.Map String [([String], Int)])
 
-type Rule = (String, [String])
+bestRule :: String -> M.Map String [([String], Int)] -> [String]
+bestRule lhs = fst
+             . head
+             . fromJust
+             . M.lookup lhs
 
-getRules :: [Tree SNode] -> S.Set Rule
-getRules = F.foldl' readoff (S.empty :: S.Set Rule)
-    where readoff ruleset (Node (NT rootTag) children) =
-                let newrule = (rootTag, map (tag . rootLabel) children)
-                in newrule `deepseq` 
-                   F.foldl' readoff (S.insert newrule ruleset) children
-          readoff ruleset _ = ruleset
+decentRandomRule :: String -> M.Map String [([String], Int)] -> State StdGen [String]
+decentRandomRule lhs = takeSomeRandomOne
+                     . fromJust
+                     . M.lookup lhs
+    where takeSomeRandomOne l = do randomGen <- get
+                                   let (n, newGen) = randomR (-3.0, 0.0 :: Double) randomGen
+                                   put newGen
+                                   return $ fst $ l !! (floor $ (fromIntegral $ min 10 (length l)) * exp n)
 
-countRules :: [Tree SNode] -> M.Map Rule Int
-countRules = F.foldl' readoff (M.empty :: M.Map Rule Int)
-    where readoff rulemap (Node (NT rootTag) children) =
-                let newrule = (rootTag, map (tag . rootLabel) children)
-                in newrule `deepseq`
-                   F.foldl' readoff (M.insertWith (+) newrule 1 rulemap) children
-          readoff rulemap _ = rulemap
+derivationStep :: M.Map String [([String], Int)] -> String -> [String]
+derivationStep m lhs = if isNT lhs m
+                       then bestRule lhs m
+                       else [lhs]
 
-countCallers :: String -> M.Map Rule Int -> M.Map String Int
-countCallers callee = M.foldlWithKey' ( \ oldresmap rule occ
-                                       -> M.insertWith (+)
-                                                       (fst rule)
-                                                       occ
-                                                       oldresmap )
-                               (M.empty :: M.Map String Int)
-                    . M.filterWithKey (\rule _ -> callee `elem` snd rule)
+isNT :: String -> M.Map String [([String], Int)] -> Bool
+isNT x = elem x . M.keys
