@@ -27,8 +27,8 @@ data SNode = NT {tag::String} | T {tag::String, word::String} deriving Show
 simplifySentenceTree :: Tree (Maybe SentenceData) -> Tree SNode
 simplifySentenceTree = fmap fnc
     where fnc Nothing = NT "ROOT"
-          fnc (Just (SentenceWord w p m (Edge label _) _ _)) = T (p++"/"++label) w
-          fnc (Just (SentenceNode _ p m (Edge label _) _ _)) = NT (p++"/"++label)
+          fnc (Just (SentenceWord w p m (Edge label _) _ _)) = T (p++"/"++label++"/"++m) w
+          fnc (Just (SentenceNode _ p m (Edge label _) _ _)) = NT (p++"/"++label++"/"++m)
 
 simpleParseNegra :: Text -> [Tree (Maybe SentenceData)]
 simpleParseNegra = map getTree . sentences . parseNegra

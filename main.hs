@@ -10,7 +10,7 @@ import Data.Ord (comparing)
 import Data.Tree (Tree(Node), rootLabel, subForest, drawTree)
 import System.Random (StdGen, randomR, getStdGen)
 
-
+import Debug.Trace (trace)
 import qualified Data.Text.Lazy.IO as TIO
 
 main :: IO ()
@@ -34,17 +34,11 @@ main = do --{-
           let generateSentence :: State StdGen [String]
               -- generateSentence = decentRandomLookup "S" ruleBook
               generateSentence = fullyDerive ["ROOT"]
-          mapM_ (putStrLn . (++"\n") . beautifulUnwords) $ evalState (sequence $ replicate 100 generateSentence) rndGen
           
-          -- -}
+          let sentences = evalState (sequence $ replicate 100 generateSentence) rndGen
           
-          {-
-          print $ M.lookup "$./--" wordBook
-          print $ evalState (sequence $ replicate 5 generateSentence) $ read "foo"
-          print $ evalState (sequence $ replicate 5 generateSentence) $ read "bar"
-          print $ evalState (sequence $ replicate 5 generateSentence) $ read "baz"
-          print $ evalState (sequence $ replicate 5 generateSentence) $ read "bat"
-          print $ evalState (sequence $ replicate 5 generateSentence) $ read "val"
+          mapM_ (putStrLn . (++"\n") . beautifulUnwords) $ filter (\x -> length x > 10) sentences
+          
           -- -}
           
           {-
@@ -84,8 +78,14 @@ decentRandomLookup lhs = takeSomeRandomOne
     where takeSomeRandomOne l = do randomGen <- get
                                    let (n, newGen) = randomR (-4.0, 0.0 :: Double) randomGen
                                    put newGen
-                                   let index = (fromIntegral $ min 30 (length l)) * exp n
-                                   return $ fst $ l !! (floor index)
+                                   -- Choose entries better than a tenth of the best,
+                                   -- but they need to have at most a score of 3.
+                                   let edge = max 3 ((snd $ head l) `div` 10)
+                                   let bestn = length $ takeWhile ((>edge) . snd) l
+                                   -- Choose from these entries: exp n is between 0 and 1,
+                                   -- but is likely close to 0, so the first ones are preferred.
+                                   let index = (fromIntegral bestn) * exp n
+                                   trace (show bestn ++ " ") $ return $ fst $ l !! (floor index)
 
 bestDerivationStep :: M.Map String [([String], Int)]
                    -> M.Map String [(String, Int)]
