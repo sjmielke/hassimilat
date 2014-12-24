@@ -7,7 +7,7 @@ module NGrams (
     ) where
 
 import Control.Monad.State.Lazy (evalState, get, put)
-import Data.Char (toUpper)
+import Data.Char (toUpper, isSpace)
 import Data.List (sortBy)
 import Data.Ord (comparing, Down(..))
 import qualified Data.Map.Strict as M
@@ -65,8 +65,8 @@ getText :: Int -> BigramMap -> String
 getText n = beautifulUnwords . take n . buildText
 
 beautifulUnwords :: [String] -> String
-beautifulUnwords = tail . foldr accOp ""
-    where accOp el acc = if (el `elem` [",", ".", "!", "?", ")"]) || (not (null acc) && last acc == '(')
+beautifulUnwords = dropWhile isSpace . foldl accOp ""
+    where accOp acc el = if (el `elem` [",", ".", "!", "?", ")", ":", ";"]) || (not (null acc) && last acc == '(')
                          then acc ++ el
                          else acc ++ ' ':el -- TODO Use a difference-list-based approach or packaged builders for concat
 

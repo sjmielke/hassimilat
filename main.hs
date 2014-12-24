@@ -10,10 +10,14 @@ import Data.Ord (comparing)
 import Data.Tree (Tree(Node), rootLabel, subForest, drawTree)
 import System.Random (StdGen, randomR, getStdGen)
 
+
+import qualified Data.Text.Lazy.IO as TIO
+
 main :: IO ()
-main = do tiger <- getTreeCorpus Tiger
+main = do --{-
+          tiger <- getTreeCorpus Tiger
           let rulesOcc = countRules tiger
-          let ruleBook = toConstructiveForm rulesOcc
+          let ruleBook = eliminateChainRules $ toConstructiveForm rulesOcc
           
           let wordOcc = countWordRules tiger
           let wordBook = toConstructiveForm wordOcc
@@ -29,9 +33,25 @@ main = do tiger <- getTreeCorpus Tiger
           
           let generateSentence :: State StdGen [String]
               -- generateSentence = decentRandomLookup "S" ruleBook
-              generateSentence = fullyDerive ["S", "$."]
-          mapM_ (putStrLn . beautifulUnwords) $ sort
-                                              $ evalState (sequence $ replicate 100 generateSentence) rndGen
+              generateSentence = fullyDerive ["ROOT"]
+          mapM_ (putStrLn . (++"\n") . beautifulUnwords) $ evalState (sequence $ replicate 100 generateSentence) rndGen
+          
+          -- -}
+          
+          {-
+          print $ M.lookup "$./--" wordBook
+          print $ evalState (sequence $ replicate 5 generateSentence) $ read "foo"
+          print $ evalState (sequence $ replicate 5 generateSentence) $ read "bar"
+          print $ evalState (sequence $ replicate 5 generateSentence) $ read "baz"
+          print $ evalState (sequence $ replicate 5 generateSentence) $ read "bat"
+          print $ evalState (sequence $ replicate 5 generateSentence) $ read "val"
+          -- -}
+          
+          {-
+          sentence <- fmap (head . simpleParseNegra) $ TIO.readFile "data/overlappingsentence.export"
+          putStrLn $ drawTree $ fmap show $ sentence
+          putStrLn $ drawTree $ fmap show $ simplifySentenceTree sentence
+          -- -}
 
 -- Note: I stay with the simple Int scores for now, choosing
 -- best options works just as well there (as we have seen
@@ -46,6 +66,11 @@ toConstructiveForm = M.map (reverse . sortBy (comparing snd))
                                                       oldresmap )
                                      (M.empty :: M.Map String [(rhs, Int)])
 
+-- | Eliminating chain rules doesn't affect my results,
+-- but it works better for the current derivation mechanism.
+eliminateChainRules :: M.Map String [([String], Int)] -> M.Map String [([String], Int)]
+eliminateChainRules = M.mapWithKey (\lhs rhss -> filter (\(rhs,_) -> [lhs] /= rhs) rhss)
+
 bestLookup :: String -> M.Map String [(a, Int)] -> a
 bestLookup lhs = fst
                . head
@@ -57,9 +82,10 @@ decentRandomLookup lhs = takeSomeRandomOne
                        . fromJust
                        . M.lookup lhs
     where takeSomeRandomOne l = do randomGen <- get
-                                   let (n, newGen) = randomR (-3.0, 0.0 :: Double) randomGen
+                                   let (n, newGen) = randomR (-4.0, 0.0 :: Double) randomGen
                                    put newGen
-                                   return $ fst $ l !! (floor $ (fromIntegral $ min 30 (length l)) * exp n)
+                                   let index = (fromIntegral $ min 30 (length l)) * exp n
+                                   return $ fst $ l !! (floor index)
 
 bestDerivationStep :: M.Map String [([String], Int)]
                    -> M.Map String [(String, Int)]
